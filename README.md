@@ -272,3 +272,55 @@ Want to try out the full version of Proxy? Visit [proxy.convergence.ai](https://
   year={2025}
 }
 ```
+
+## Memory Management
+
+### Automatic Model Unloading
+The system automatically unloads models from GPU memory after task completion to optimize resource usage. This feature:
+
+- Triggers automatically after each successful task
+- Frees up GPU VRAM immediately
+- Resets model validation state
+- Handles cleanup gracefully with error logging
+
+Implementation details:
+```python
+# Model unloading is handled by ConvergenceClient
+await client.unload_model()  # Called automatically after task completion
+
+# Memory is freed through vLLM's model management endpoint
+DELETE /models/{model_id}
+```
+
+### When Model Unloading Occurs
+1. After successful task completion
+2. When the Runner determines the task is complete
+3. Before starting a new task (if previous model is loaded)
+
+### Memory Usage Patterns
+- Initial load: ~7.5GB for model weights
+- Runtime: Additional memory for KV cache and image processing
+- After unload: Only system overhead remains
+
+### Configuration
+Memory-related settings in the Dockerfile:
+```bash
+--gpu-memory-utilization 0.6    # Maximum GPU memory usage (60%)
+--max-num-batched-tokens 8192   # Maximum batch size for inference
+--max-model-len 8192           # Maximum sequence length
+--block-size 16               # Size of attention blocks
+--max-num-seqs 32            # Maximum concurrent sequences
+```
+
+### Monitoring
+You can monitor GPU memory usage with:
+```bash
+nvidia-smi -l 1  # Updates every second
+```
+
+### Troubleshooting
+If model fails to unload:
+1. Check vLLM server logs
+2. Ensure API endpoints are accessible
+3. Verify GPU memory usage with nvidia-smi
+4. Restart container if necessary

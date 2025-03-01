@@ -76,6 +76,29 @@ class RunnerConfig(BaseModel):
 
 
 class Runner(BaseModel):
+    """Runner manages the execution of tasks and handles model lifecycle.
+
+    The Runner is responsible for:
+    1. Task execution and coordination
+    2. Model memory management
+    3. Environment setup and cleanup
+    4. Error handling and logging
+
+    Memory Management:
+    - Models are loaded on demand when tasks start
+    - Automatic unloading after task completion
+    - GPU memory is freed between tasks
+    - Resource cleanup on errors or timeouts
+
+    Example:
+        ```python
+        config = RunnerConfig.from_dict({...})
+        runner = Runner(config=config)
+        result = await runner.run("Perform task")
+        # Model is automatically unloaded after completion
+        ```
+    """
+    
     config: RunnerConfig
     recorder: DataRecorder | None = None
     environment: type[BaseEnvironment] | None = None

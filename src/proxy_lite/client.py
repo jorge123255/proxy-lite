@@ -167,7 +167,32 @@ class ConvergenceClient(OpenAIClient):
         return await self.external_client.chat.completions.create(**base_params)
 
     async def unload_model(self) -> None:
-        """Unload the model from GPU memory"""
+        """Unload the model from GPU memory to free resources.
+
+        This method:
+        1. Sends a DELETE request to the vLLM server to unload the model
+        2. Resets the model validation state
+        3. Logs the operation status
+
+        The unloading process is triggered automatically:
+        - After successful task completion
+        - When switching to a different model
+        - Before container shutdown
+
+        Raises:
+            Exception: If the model fails to unload or the API request fails
+            
+        Example:
+            ```python
+            client = ConvergenceClient(config=config)
+            try:
+                # Use model for inference
+                await client.create_completion(messages)
+            finally:
+                # Ensure model is unloaded
+                await client.unload_model()
+            ```
+        """
         try:
             await self.external_client.delete(f"/models/{self.config.model_id}")
             self._model_validated = False
