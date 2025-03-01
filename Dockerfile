@@ -73,8 +73,8 @@ Xvfb :99 -screen 0 1280x1024x24 & \n\
 sleep 1\n\
 source /app/.venv/bin/activate\n\
 \n\
-# Start vLLM server in background\n\
-vllm serve convergence-ai/proxy-lite-3b \
+# Start vLLM server in background without loading model\n\
+vllm serve \
     --trust-remote-code \
     --enable-auto-tool-choice \
     --tool-call-parser hermes \

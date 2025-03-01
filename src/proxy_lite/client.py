@@ -121,6 +121,7 @@ class ConvergenceClient(OpenAIClient):
     config: ConvergenceClientConfig
     serializer: ClassVar[OpenAICompatibleSerializer] = OpenAICompatibleSerializer()
     _model_validated: bool = False
+    _model_loaded: bool = False
 
     async def _validate_model(self) -> None:
         try:
@@ -133,6 +134,34 @@ class ConvergenceClient(OpenAIClient):
         except Exception as e:
             logger.error(f"Error retrieving model: {e}")
             raise e
+
+    async def load_model(self) -> None:
+        """Load the model into GPU memory.
+        
+        This method:
+        1. Sends a POST request to load the model if not already loaded
+        2. Validates the model is accessible
+        3. Sets the model loaded state
+        
+        The loading process happens:
+        - On first use of create_completion
+        - After model has been unloaded
+        - When switching to a different model
+        
+        Raises:
+            Exception: If the model fails to load or the API request fails
+        """
+        if not self._model_loaded:
+            try:
+                await self.external_client.post(
+                    "/models",
+                    json={"name": self.config.model_id}
+                )
+                self._model_loaded = True
+                logger.debug(f"Model {self.config.model_id} loaded into GPU")
+            except Exception as e:
+                logger.error(f"Error loading model: {e}")
+                raise e
 
     @cached_property
     def external_client(self) -> AsyncOpenAI:
@@ -150,8 +179,13 @@ class ConvergenceClient(OpenAIClient):
         tools: Optional[list[Tool]] = None,
         response_format: Optional[type[BaseModel]] = None,
     ) -> ChatCompletion:
+        # Load model if not loaded
+        if not self._model_loaded:
+            await self.load_model()
+        
         if not self._model_validated:
             await self._validate_model()
+        
         base_params = {
             "model": self.config.model_id,
             "messages": self.serializer.serialize_messages(messages),
@@ -168,38 +202,29 @@ class ConvergenceClient(OpenAIClient):
 
     async def unload_model(self) -> None:
         """Unload the model from GPU memory to free resources.
-
+        
         This method:
         1. Sends a DELETE request to the vLLM server to unload the model
-        2. Resets the model validation state
+        2. Resets the model validation and loaded states
         3. Logs the operation status
-
+        
         The unloading process is triggered automatically:
         - After successful task completion
         - When switching to a different model
         - Before container shutdown
-
+        
         Raises:
             Exception: If the model fails to unload or the API request fails
-            
-        Example:
-            ```python
-            client = ConvergenceClient(config=config)
-            try:
-                # Use model for inference
-                await client.create_completion(messages)
-            finally:
-                # Ensure model is unloaded
-                await client.unload_model()
-            ```
         """
-        try:
-            await self.external_client.delete(f"/models/{self.config.model_id}")
-            self._model_validated = False
-            logger.debug(f"Model {self.config.model_id} unloaded from GPU")
-        except Exception as e:
-            logger.error(f"Error unloading model: {e}")
-            raise e
+        if self._model_loaded:
+            try:
+                await self.external_client.delete(f"/models/{self.config.model_id}")
+                self._model_validated = False
+                self._model_loaded = False
+                logger.debug(f"Model {self.config.model_id} unloaded from GPU")
+            except Exception as e:
+                logger.error(f"Error unloading model: {e}")
+                raise e
 
 
 ClientConfigTypes = Union[OpenAIClientConfig, ConvergenceClientConfig]

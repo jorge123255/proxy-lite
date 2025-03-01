@@ -275,32 +275,45 @@ Want to try out the full version of Proxy? Visit [proxy.convergence.ai](https://
 
 ## Memory Management
 
-### Automatic Model Unloading
-The system automatically unloads models from GPU memory after task completion to optimize resource usage. This feature:
+### Lazy Model Loading
+The system uses lazy loading to optimize GPU memory usage. This means:
 
-- Triggers automatically after each successful task
-- Frees up GPU VRAM immediately
-- Resets model validation state
-- Handles cleanup gracefully with error logging
+- Model is NOT loaded when Docker container starts
+- Loading occurs only when the first task is received
+- GPU memory remains free until actually needed
+- Multiple models can be loaded/unloaded as needed
 
 Implementation details:
 ```python
-# Model unloading is handled by ConvergenceClient
-await client.unload_model()  # Called automatically after task completion
+# Model loading happens automatically on first use
+await client.create_completion(messages)  # Will trigger model load if needed
 
-# Memory is freed through vLLM's model management endpoint
-DELETE /models/{model_id}
+# Or manually load the model
+await client.load_model()
+
+# Unload when done
+await client.unload_model()
 ```
 
-### When Model Unloading Occurs
-1. After successful task completion
-2. When the Runner determines the task is complete
-3. Before starting a new task (if previous model is loaded)
+### Memory Lifecycle
+1. Container Start:
+   - vLLM server starts without any model loaded
+   - Minimal GPU memory footprint
+   - System ready to accept tasks
 
-### Memory Usage Patterns
-- Initial load: ~7.5GB for model weights
-- Runtime: Additional memory for KV cache and image processing
-- After unload: Only system overhead remains
+2. First Task:
+   - Model is loaded into GPU memory (~7.5GB)
+   - Validation ensures model is accessible
+   - Task processing begins
+
+3. Task Completion:
+   - Model is automatically unloaded
+   - GPU memory is freed
+   - System returns to minimal footprint
+
+4. Subsequent Tasks:
+   - Process repeats from step 2
+   - Each task gets a fresh model instance
 
 ### Configuration
 Memory-related settings in the Dockerfile:
@@ -313,14 +326,20 @@ Memory-related settings in the Dockerfile:
 ```
 
 ### Monitoring
-You can monitor GPU memory usage with:
+Monitor GPU memory usage with:
 ```bash
 nvidia-smi -l 1  # Updates every second
 ```
 
+You should see:
+- Low memory usage when idle
+- Memory spike when model loads
+- Memory freed after task completion
+
 ### Troubleshooting
-If model fails to unload:
+If model fails to load/unload:
 1. Check vLLM server logs
 2. Ensure API endpoints are accessible
 3. Verify GPU memory usage with nvidia-smi
-4. Restart container if necessary
+4. Check model availability in vLLM
+5. Restart container if necessary
