@@ -153,10 +153,13 @@ class ConvergenceClient(OpenAIClient):
         """
         if not self._model_loaded:
             try:
-                await self.external_client.post(
-                    "/models",
-                    json={"name": self.config.model_id}
-                )
+                # Use the raw http_client instead of OpenAI client for model management
+                async with self.http_client as client:
+                    response = await client.post(
+                        f"{self.config.api_base}/models",
+                        json={"name": self.config.model_id}
+                    )
+                    response.raise_for_status()
                 self._model_loaded = True
                 logger.debug(f"Model {self.config.model_id} loaded into GPU")
             except Exception as e:
@@ -218,7 +221,12 @@ class ConvergenceClient(OpenAIClient):
         """
         if self._model_loaded:
             try:
-                await self.external_client.delete(f"/models/{self.config.model_id}")
+                # Use the raw http_client instead of OpenAI client for model management
+                async with self.http_client as client:
+                    response = await client.delete(
+                        f"{self.config.api_base}/models/{self.config.model_id}"
+                    )
+                    response.raise_for_status()
                 self._model_validated = False
                 self._model_loaded = False
                 logger.debug(f"Model {self.config.model_id} unloaded from GPU")
