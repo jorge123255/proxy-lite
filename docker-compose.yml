@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  proxy-lite-ui:
+    build: .
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - PROXY_LITE_API_BASE=http://192.168.1.83:8008/v1
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - /mnt/user/models/vllm:/models
+    ports:
+      - "8501:8501"  # Streamlit UI
+      - "8008:8008"  # vLLM API
+    networks:
+      br0:
+        ipv4_address: 192.168.1.83
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: '2gb'
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 65535
+        hard: 65535
+    restart: unless-stopped
+
+networks:
+  br0:
+    external: true 

@@ -166,6 +166,16 @@ class ConvergenceClient(OpenAIClient):
         base_params.update({k: v for k, v in optional_params.items() if v is not None})
         return await self.external_client.chat.completions.create(**base_params)
 
+    async def unload_model(self) -> None:
+        """Unload the model from GPU memory"""
+        try:
+            await self.external_client.delete(f"/models/{self.config.model_id}")
+            self._model_validated = False
+            logger.debug(f"Model {self.config.model_id} unloaded from GPU")
+        except Exception as e:
+            logger.error(f"Error unloading model: {e}")
+            raise e
+
 
 ClientConfigTypes = Union[OpenAIClientConfig, ConvergenceClientConfig]
 ClientTypes = Union[OpenAIClient, ConvergenceClient]

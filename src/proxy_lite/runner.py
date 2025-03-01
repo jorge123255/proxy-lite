@@ -170,6 +170,8 @@ class Runner(BaseModel):
     async def run(self, task: str) -> Run:
         async for run in self.run_generator(task):
             self._run = run
+            if run.complete and isinstance(self.config.solver.client, ConvergenceClient):
+                await self.config.solver.client.unload_model()
         return run
 
     def run_concurrent(self, tasks: list[str]) -> list[Run]:

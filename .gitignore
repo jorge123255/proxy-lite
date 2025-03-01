@@ -175,3 +175,25 @@ local_trajectories/
 screenshots/
 gifs/
 .DS_Store
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Model files
+models/
+*.safetensors
+*.bin
