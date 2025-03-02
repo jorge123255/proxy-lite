@@ -157,7 +157,7 @@ class ConvergenceClient(OpenAIClient):
                 async with self.http_client as client:
                     response = await client.post(
                         f"{self.config.api_base}/models",
-                        json={"name": self.config.model_id}
+                        data={"name": self.config.model_id}
                     )
                     response.raise_for_status()
                 self._model_loaded = True
